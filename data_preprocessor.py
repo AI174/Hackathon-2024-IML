@@ -9,7 +9,7 @@ class DataPreprocessor:
         self.scaler = StandardScaler()
         self.imputer = SimpleImputer(strategy='mean')
 
-    def preprocess_data(self, data, is_training=True):
+    def preprocess_data(data, is_training=True):
         print(f"Initial data shape: {data.shape}")
 
         # Separate trip_id_unique_station to handle it independently
@@ -20,17 +20,10 @@ class DataPreprocessor:
         columns_to_drop = ['line_id', 'part', 'trip_id_unique', 'station_id', 'station_name']
         data.drop(columns=columns_to_drop, inplace=True)
 
-        # Encode categorical features
-        categorical_features = ['direction', 'cluster']
-        for feature in categorical_features:
-            if feature not in self.label_encoders:
-                self.label_encoders[feature] = LabelEncoder()
-            if is_training:
-                data[feature] = self.label_encoders[feature].fit_transform(data[feature])
-            else:
-                data[feature] = self.label_encoders[feature].transform(data[feature])
+        # Modify specified columns
+        data['direction'] = LabelEncoder().fit_transform(data['direction'])
+        data['cluster'] = LabelEncoder().fit_transform(data['cluster'])
 
-        # Convert time columns to datetime
         data['arrival_time'] = pd.to_datetime(data['arrival_time'], format='%H:%M:%S', errors='coerce')
         data['door_closing_time'] = pd.to_datetime(data['door_closing_time'], format='%H:%M:%S', errors='coerce')
 
@@ -38,7 +31,8 @@ class DataPreprocessor:
         data = data[data['arrival_time'].notnull()]
 
         # Create time_in_station for valid rows
-        valid_rows = (data['door_closing_time'].notnull()) & (data['door_closing_time'] >= data['arrival_time']) & (data['door_closing_time'].dt.date == data['arrival_time'].dt.date)
+        valid_rows = (data['door_closing_time'].notnull()) & (data['door_closing_time'] >= data['arrival_time']) & (
+                    data['door_closing_time'].dt.date == data['arrival_time'].dt.date)
         data['time_in_station'] = (data['door_closing_time'] - data['arrival_time']).dt.total_seconds()
 
         # Handle potential negative values in time_in_station
@@ -50,10 +44,8 @@ class DataPreprocessor:
         data['time_in_station'].fillna(average_time_in_station, inplace=True)
         data.drop(columns=['arrival_time', 'door_closing_time'], inplace=True)
 
-        # Convert boolean to int
         data['arrival_is_estimated'] = data['arrival_is_estimated'].astype(int)
 
-        # Create new feature bus_capacity_at_arrival
         if is_training:
             data['bus_capacity_at_arrival'] = data['passengers_continue'] + data['passengers_up']
         else:
@@ -85,7 +77,8 @@ class DataPreprocessor:
         # Feature Scaling
         numerical_features = ['station_index', 'latitude', 'longitude', 'mekadem_nipuach_luz',
                               'passengers_continue_menupach', 'time_in_station', 'bus_capacity_at_arrival']
-        data[numerical_features] = self.scaler.fit_transform(data[numerical_features])
+        scaler = StandardScaler()
+        data[numerical_features] = scaler.fit_transform(data[numerical_features])
 
         print(f"Data shape after scaling: {data.shape}")
         print(f"Columns after preprocessing: {data.columns}")
@@ -96,6 +89,3 @@ class DataPreprocessor:
             return X, y, trip_id_unique_station
         else:
             return data, trip_id_unique_station
-
-    def preprocess_test(self, data):
-        return self.preprocess_data(data, is_training=False)
