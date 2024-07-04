@@ -1,15 +1,12 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.impute import SimpleImputer
 
-class DataPreprocessor:
+class Preprocessor:
     def __init__(self):
-        self.label_encoders = {}
         self.scaler = StandardScaler()
-        self.imputer = SimpleImputer(strategy='mean')
 
-    def preprocess_data(data, is_training=True):
+    def preprocess_data(self, data, is_training=True):
         print(f"Initial data shape: {data.shape}")
 
         # Separate trip_id_unique_station to handle it independently
@@ -31,8 +28,7 @@ class DataPreprocessor:
         data = data[data['arrival_time'].notnull()]
 
         # Create time_in_station for valid rows
-        valid_rows = (data['door_closing_time'].notnull()) & (data['door_closing_time'] >= data['arrival_time']) & (
-                    data['door_closing_time'].dt.date == data['arrival_time'].dt.date)
+        valid_rows = (data['door_closing_time'].notnull()) & (data['door_closing_time'] >= data['arrival_time']) & (data['door_closing_time'].dt.date == data['arrival_time'].dt.date)
         data['time_in_station'] = (data['door_closing_time'] - data['arrival_time']).dt.total_seconds()
 
         # Handle potential negative values in time_in_station
@@ -77,8 +73,7 @@ class DataPreprocessor:
         # Feature Scaling
         numerical_features = ['station_index', 'latitude', 'longitude', 'mekadem_nipuach_luz',
                               'passengers_continue_menupach', 'time_in_station', 'bus_capacity_at_arrival']
-        scaler = StandardScaler()
-        data[numerical_features] = scaler.fit_transform(data[numerical_features])
+        data[numerical_features] = self.scaler.fit_transform(data[numerical_features])
 
         print(f"Data shape after scaling: {data.shape}")
         print(f"Columns after preprocessing: {data.columns}")
