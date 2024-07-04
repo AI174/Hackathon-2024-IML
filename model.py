@@ -12,13 +12,14 @@ class LinearRegressModel:
 
     def predict(self, X):
         predictions = self.model.predict(X)
-        # Delete the negative predictions in case there is
-        return np.clip(predictions, 0, None)
+        # Ensure no negative predictions
+        predictions[predictions < 0] = 0
+        return predictions
 
 
 class DecisionTreeRegressModel:
     def __init__(self):
-        self.model = DecisionTreeRegressor(max_depth=12)
+        self.model = DecisionTreeRegressor(max_depth=12)   # I don't know wtf is this number
 
     def train(self, X_train, y_train):
         return self.model.fit(X_train, y_train)
