@@ -1,9 +1,7 @@
 from argparse import ArgumentParser
 import pandas as pd
 from data_preprocessor import Preprocessor
-from model import Model
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from model import LinearRegressModel
 import numpy as np
 import logging
 
@@ -41,7 +39,7 @@ if __name__ == '__main__':
 
     # 3. train a model
     logging.info("training...")
-    model = Model()
+    model = LinearRegressModel()
     model.train(X_train, y_train)  # Corrected: Do not reassign `model`
 
     # 4. load the test set (args.test_set)
