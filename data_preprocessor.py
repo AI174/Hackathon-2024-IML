@@ -76,3 +76,49 @@ class Preprocessor:
             return X, y, trip_id_unique_station
         else:
             return data, trip_id_unique_station
+
+    def preprocess_data2(self, data, is_training=True):
+        # Drop rows with missing values
+        data.dropna(inplace=True)
+        # Convert 'arrival_time' to datetime
+
+        data['arrival_time'] = pd.to_datetime(data['arrival_time'], format='%H:%M:%S')
+
+        data = data.sort_values(by=['trip_id_unique', 'direction', 'station_index'])
+        # Ensure data is sorted by 'trip_id_unique', 'direction', and 'station_index'
+
+        # Group by 'trip_id_unique' and calculate the time difference between the first and last station
+        trip_time_diff = data.groupby(['trip_id_unique'])['arrival_time'].agg(
+            ['first', 'last'])
+
+        # Step 1: Create a mapping of cluster names to numeric labels
+        trip_time_diff['cluster'] = (
+            data.groupby('trip_id_unique')['cluster'].agg(['first']).transform(lambda x: pd.factorize(x)[0]))
+        # trip_time_diff['cluster'] = .transform(lambda x: pd.factorize(x)[0])
+
+        total_passengers_per_trip = data.groupby('trip_id_unique')['passengers_up'].sum().astype(int)
+
+        station_cor = data.groupby(['trip_id_unique'])[['latitude', 'longitude']].agg(
+            ['first', 'last']).astype(float)
+
+        # Calculate trip duration considering potential day change
+        trip_time_diff['trip_duration'] = trip_time_diff.apply(
+            lambda x: (x['last'] - x['first']).total_seconds() / 60.0
+            if x['last'] >= x['first']
+            else ((pd.Timedelta(days=1) + x['last'] - x['first']).total_seconds() / 60.0),
+            axis=1)
+
+        # Remove rows where trip duration is negative
+        trip_time_diff = trip_time_diff[trip_time_diff['trip_duration'] >= 0]
+
+        # Extract the start hour and minute for each trip
+        trip_time_diff['start_hour'] = trip_time_diff['first'].dt.hour.astype(int)
+
+        # Merge trip_time_diff back into original data based on 'trip_id_unique'
+        trip_time_diff = pd.merge(total_passengers_per_trip,
+                                  trip_time_diff,
+                                  left_on='trip_id_unique', right_index=True, how='left')
+
+
+
+
