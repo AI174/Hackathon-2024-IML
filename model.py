@@ -10,4 +10,5 @@ class Model:
 
     def predict(self, X):
         predictions = self.model.predict(X)
-        return np.clip(predictions, 0, None)  # Ensure no negative predictions
+        # Delete the negative predictions in case there is
+        return np.clip(predictions, 0, None)
