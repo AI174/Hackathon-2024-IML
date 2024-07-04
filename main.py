@@ -40,7 +40,7 @@ if __name__ == '__main__':
     # 3. train a model
     logging.info("training...")
     model = LinearRegressModel()
-    model.train(X_train, y_train)  # Corrected: Do not reassign `model`
+    model = model.train(X_train, y_train)  # Corrected: Do not reassign `model`
 
     # 4. load the test set (args.test_set)
     test_data = pd.read_csv(args.test_set, encoding='ISO-8859-1')
