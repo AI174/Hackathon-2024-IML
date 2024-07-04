@@ -2,82 +2,74 @@ import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 
+
 class Preprocessor:
     def __init__(self):
         self.scaler = StandardScaler()
 
     def preprocess_data(self, data, is_training=True):
-        print(f"Initial data shape: {data.shape}")
 
         # Separate trip_id_unique_station to handle it independently
         trip_id_unique_station = data['trip_id_unique_station'].copy()
         data.drop(columns=['trip_id_unique_station'], inplace=True)
 
         # Drop specified columns
-        columns_to_drop = ['line_id', 'part', 'trip_id_unique', 'station_id', 'station_name']
-        data.drop(columns=columns_to_drop, inplace=True)
+        data.drop(columns=['line_id', 'part', 'trip_id_unique', 'station_id', 'station_name'], inplace=True)
 
-        # Modify specified columns
-        data['direction'] = LabelEncoder().fit_transform(data['direction'])
-        data['cluster'] = LabelEncoder().fit_transform(data['cluster'])
+        # convert date
+        list_date = ['arrival_time', 'door_closing_time']
+        for time in list_date:
+            data[time] = pd.to_datetime(data[time], format='%H:%M:%S', errors='coerce')
 
-        data['arrival_time'] = pd.to_datetime(data['arrival_time'], format='%H:%M:%S', errors='coerce')
-        data['door_closing_time'] = pd.to_datetime(data['door_closing_time'], format='%H:%M:%S', errors='coerce')
+        # add new col
+        arrive_time = data['arrival_time']
+        close_time = data['door_closing_time']
+        diff = (close_time - arrive_time)
+        data['time_in_station'] = diff.dt.total_seconds()
 
-        # Remove rows where arrival_time is null
-        data = data[data['arrival_time'].notnull()]
+        # convert categorical
+        list_categorial = ['direction', 'cluster']
+        for categorial in list_categorial:
+            data[categorial] = LabelEncoder().fit_transform(data[categorial])
 
-        # Create time_in_station for valid rows
-        valid_rows = (data['door_closing_time'].notnull()) & (data['door_closing_time'] >= data['arrival_time']) & (data['door_closing_time'].dt.date == data['arrival_time'].dt.date)
-        data['time_in_station'] = (data['door_closing_time'] - data['arrival_time']).dt.total_seconds()
-
-        # Handle potential negative values in time_in_station
-        data.loc[data['time_in_station'] < 0, 'time_in_station'] = np.nan
-
-        average_time_in_station = data['time_in_station'].dropna().mean()
-
-        # Fill time_in_station for invalid rows with the average
-        data['time_in_station'].fillna(average_time_in_station, inplace=True)
-        data.drop(columns=['arrival_time', 'door_closing_time'], inplace=True)
-
+        # Convert true false to numbers
         data['arrival_is_estimated'] = data['arrival_is_estimated'].astype(int)
 
+        # Remove/Replace all null
+        data = data.dropna(subset=['arrival_time'])
+        data.replace('#', np.nan, inplace=True)
+
+        # deal with negative values in time_in_station
+        data['time_in_station'] = data['time_in_station'].apply(lambda x: np.nan if x < 0 else x)
+        average_time_in_station = data['time_in_station'].mean(skipna=True)
+        data['time_in_station'] = data['time_in_station'].fillna(average_time_in_station)
+
+        # Remove columns
+        data.drop(columns=['arrival_time', 'door_closing_time'], inplace=True)
+
+        # Make new column
         if is_training:
             data['bus_capacity_at_arrival'] = data['passengers_continue'] + data['passengers_up']
         else:
-            data['bus_capacity_at_arrival'] = data['passengers_continue']  # No passengers_up in test set
+            data['bus_capacity_at_arrival'] = data['passengers_continue']
 
+        # Drop the passengers_continue ( no need for it)
         data.drop(columns=['passengers_continue'], inplace=True)
 
-        # Replace non-numeric values with NaN
-        data.replace('#', np.nan, inplace=True)
-
-        print(f"Data shape after dropping columns and replacing values: {data.shape}")
-
         # Convert all columns to numeric, forcing errors to NaN
-        data = data.apply(pd.to_numeric, errors='coerce')
-
-        print(f"Data shape after converting to numeric: {data.shape}")
+        for col in data.columns:
+            data[col] = pd.to_numeric(data[col], errors='coerce')
 
         # Handle missing values by filling with the median value of the column
-        data.fillna(data.median(), inplace=True)
-
-        print(f"Data shape after filling NaN values: {data.shape}")
-
-        # Ensure there are no NaN or infinite values left
-        if data.isnull().values.any() or np.isinf(data.values).any():
-            print("Warning: NaN or infinity values found in the data after filling NaN values.")
-            data = data.dropna()  # Drop rows with remaining NaN or infinity values
-            trip_id_unique_station = trip_id_unique_station.loc[data.index]
+        for col in data.columns:
+            median_value = data[col].median()
+            data[col].fillna(median_value, inplace=True)
 
         # Feature Scaling
-        numerical_features = ['station_index', 'latitude', 'longitude', 'mekadem_nipuach_luz',
-                              'passengers_continue_menupach', 'time_in_station', 'bus_capacity_at_arrival']
-        data[numerical_features] = self.scaler.fit_transform(data[numerical_features])
-
-        print(f"Data shape after scaling: {data.shape}")
-        print(f"Columns after preprocessing: {data.columns}")
-
+        data[['station_index', 'latitude', 'longitude', 'mekadem_nipuach_luz',
+                              'passengers_continue_menupach', 'time_in_station', 'bus_capacity_at_arrival']] =\
+            self.scaler.fit_transform(data[['station_index', 'latitude', 'longitude', 'mekadem_nipuach_luz',
+                              'passengers_continue_menupach', 'time_in_station', 'bus_capacity_at_arrival']])
         if is_training:
             X = data.drop(columns=['passengers_up'])
             y = data['passengers_up']
