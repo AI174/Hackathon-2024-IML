@@ -14,8 +14,8 @@ train, valid = train_test_split(train_data, test_size=0.2, random_state=42)
 preprocessor = DataPreprocessor()
 
 # Preprocess the training and validation data
-X_train, y_train = preprocessor.preprocess_data(train, is_training=True)
-X_valid, y_valid = preprocessor.preprocess_data(valid, is_training=True)
+X_train, y_train, train_trip_ids = preprocessor.preprocess_data(train, is_training=True)
+X_valid, y_valid, valid_trip_ids = preprocessor.preprocess_data(valid, is_training=True)
 
 # Train the model in phases
 model = Model()
@@ -40,11 +40,14 @@ print(f'Mean Squared Error at different training sizes: {mse_scores}')
 model.fit(X_train, y_train)
 
 # Preprocess the test data
-X_test = preprocessor.preprocess_test(test_data)
+X_test, test_trip_ids = preprocessor.preprocess_test(test_data)
 
 # Make predictions on the test set
 test_data['passengers_up'] = model.predict(X_test)
 
+# Reattach trip_id_unique_station to the test_data DataFrame
+test_data['trip_id_unique_station'] = test_trip_ids
+
 # Save the predictions to a CSV file
 predictions = test_data[['trip_id_unique_station', 'passengers_up']]
-predictions.to_csv('/mnt/data/passengers_up_predictions.csv', index=False)
+predictions.to_csv('passengers_up_predictions.csv', index=False)
